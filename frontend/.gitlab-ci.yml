@@ -1,0 +1,96 @@
+stages:
+    - pre_build
+    - build_image
+    # - unit_test
+    - sonarqube-check
+    - tagging
+    
+
+build-only-MR:
+  stage: pre_build
+  image:
+    name: gcr.io/kaniko-project/executor:debug
+    entrypoint: [""]
+  script:
+    - /kaniko/executor --context "${CI_PROJECT_DIR}" --dockerfile "${CI_PROJECT_DIR}/Dockerfile" --no-push
+  only:
+    - merge_requests
+
+# unit-test:
+#   stage: unit_test
+#   image: 
+#     name: node:18
+#   before_script:
+#     - yarn install
+#   script:
+#     # - yarn vitest --coverage.enabled --coverage.all -u --coverage.reporter='lcov'
+#     - yarn vitest --coverage.enabled --coverage.all -u --coverage.reporter='lcov' --coverage.reporter='cobertura' --outputFile=test-report.xml
+#   coverage: /All files[^|]*\|[^|]*\s+([\d\.]+)/
+#   artifacts:
+#     paths:
+#       - coverage/lcov.info
+#       - test-report.xml
+#   allow_failure: true
+#   only:
+#     - main
+
+sonarqube-check:
+  stage: sonarqube-check
+  image: 
+    name: node:18
+    # name: sonarsource/sonar-scanner-cli:latest
+    entrypoint: [""]
+  variables:
+    SONAR_USER_HOME: "${CI_PROJECT_DIR}/.sonar"  # Defines the location of the analysis task cache
+    GIT_DEPTH: "0"  # Tells git to fetch all the branches of the project, required by the analysis task 
+  script: 
+    - npm install -g sonarqube-scanner
+    - yarn install
+    - yarn vitest --coverage.enabled -u --coverage.reporter='lcov'
+    - sonar-scanner
+        -Dsonar.projectKey=$SONAR_PROJECT_KEY
+        -Dsonar.token=$SONAR_TOKEN
+        -Dsonar.host.url=$SONAR_HOST_URL
+        -Dsonar.qualitygate.wait=true
+        -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info
+        -Dsonar.sources=src
+        -Dsonar.tests=src
+        -Dsonar.test.inclusions=**/*.test.tsx,**/*.test.ts
+  allow_failure: true
+  only:
+    - main
+  
+build-frontend:
+  stage: build_image
+  image:
+    name: gcr.io/kaniko-project/executor:debug
+    entrypoint: [""]
+  before_script:
+    - export VERSION=$(grep '"version"' package.json | cut -d '"' -f 4)
+  script:
+    - echo "{\"auths\":{\"$NEXUS_URL\":{\"auth\":\"$(echo -n $NEXUS_USER:$NEXUS_PASS | base64)\"}}}"> /kaniko/.docker/config.json
+    - /kaniko/executor --context "${CI_PROJECT_DIR}" --dockerfile "${CI_PROJECT_DIR}/Dockerfile" --destination "$NEXUS_REPO:$VERSION"
+  only:
+    - main
+  
+tagging:
+  stage: tagging
+  image: rdcib/git:latest
+  before_script:
+    - git remote set-url origin "https://$REPO_TOKEN_NAME:$REPO_ACCESS_TOKEN@gitlab.tool.mddinternship.com/devops/argocd.git"
+    - git config --global user.email "versioningBot@endava.com"
+    - git config --global user.name "versioningBot"
+    - export VERSION=$(grep '"version"' package.json | cut -d '"' -f 4)
+    - git clone https://$REPO_TOKEN_NAME:$REPO_ACCESS_TOKEN@gitlab.tool.mddinternship.com/devops/argocd.git
+    - cd argocd/Booksharing/Frontend
+  script:
+    - yq -i 'select(di == 3).spec.template.spec.containers[0].image = "'$NEXUS_REPO':'$VERSION'"' ArgoCD.yaml
+    - git add ArgoCD.yaml
+    - git commit -m "Tag to $VERSION"
+    - git push origin HEAD:main
+  needs: [build-frontend]
+  only:
+    - main
+
+
+

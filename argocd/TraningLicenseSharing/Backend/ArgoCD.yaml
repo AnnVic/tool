@@ -1,0 +1,139 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    appgw.ingress.kubernetes.io/health-probe-status-codes: 200-499
+    # nginx.ingress.kubernetes.io/whitelist-source-range: 193.33.93.43/32
+    appgw.ingress.kubernetes.io/ssl-redirect: 'true'
+    cert-manager.io/acme-challenge-type: http01
+    cert-manager.io/cluster-issuer: cert-manager-global
+    external-dns.alpha.kubernetes.io/hostname: tls-be.app.mddinternship.com
+  labels:
+    app: tls-be
+  name: tls-be-ingres
+spec:
+  rules:
+    - host: tls-be.app.mddinternship.com
+      http:
+        paths:
+          - backend:
+              service:
+                name: tls-be-service
+                port:
+                  number: 5000
+            path: /
+            pathType: Prefix
+  tls:
+    - hosts:
+        - tls-be.app.mddinternship.com
+      secretName: tls-be-db-tls
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: tls-be-service
+spec:
+  selector:
+    #app.kubernetes.io/name: tls-be
+    app: tls-be
+  ports:
+    - protocol: TCP
+      port: 5000
+      targetPort: 8080
+---
+apiVersion: v1
+data:
+  .dockerconfigjson: ewogICJhdXRocyI6IHsKICAgICJuZXh1cy50b29sLm1kZGludGVybnNoaXAuY29tIjogewogICAgICAiYXV0aCI6ICJZV1J0YVc0NmJtVjRkWE5CWkcxcGJnPT0iCiAgICB9CiAgfQp9Cg==
+kind: Secret
+metadata:
+  name: nexus-docker
+type: kubernetes.io/dockerconfigjson
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tls-be
+  labels:
+    app: tls-be
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: tls-be
+  template:
+    metadata:
+      labels:
+        app: tls-be
+    spec:
+      containers:
+        - name: tlsbe
+          image: nexus.tool.mddinternship.com/repository/tls-backend:1.3.6
+          imagePullPolicy: Always
+          envFrom:
+            - secretRef:
+                name: tls-db-credentials
+          # env:
+          #   - name: SPRING_DATASOURCE_URL
+          #     value: "jdbc:postgresql://postgres-postgresql.postgresql.svc:5432/TrainingLicenseSharing"
+          #   - name: SPRING_DATASOURCE_USERNAME
+          #     value: "tls_backend"
+          #   - name: SPRING_DATASOURCE_PASSWORD
+          #     value: "admin"
+          ports:
+            - containerPort: 8080
+              # readinessProbe:
+              #   httpGet:
+              #     path: /   # Adjust the path based on your application
+              #     port: 80
+              #   initialDelaySeconds: 5
+              #   periodSeconds: 5
+      imagePullSecrets:
+        - name: nexus-docker
+  strategy:
+    type: RollingUpdate
+---
+apiVersion: v1
+data:
+  SPRING_DATASOURCE_PASSWORD: YWRtaW4=
+  SPRING_DATASOURCE_URL: amRiYzpwb3N0Z3Jlc3FsOi8vcG9zdGdyZXMtcG9zdGdyZXNxbC5wb3N0Z3Jlc3FsLnN2Yzo1NDMyL1RyYWluaW5nTGljZW5zZVNoYXJpbmc=
+  SPRING_DATASOURCE_USERNAME: dGxzX2JhY2tlbmQ=
+kind: Secret
+metadata:
+  name: tls-db-credentials
+type: Opaque
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: database-migration-job
+spec:
+  #ttlSecondsAfterFinished: 100
+  template:
+    spec:
+      containers:
+        - name: database-migration-container
+          image: nexus.tool.mddinternship.com/repository/tls-backend:1.3.6
+          imagePullPolicy: Always
+          envFrom:
+            - secretRef:
+                name: tls-migration-credentials
+          # env:
+          #   - name: FLYWAY_URL
+          #     value: "jdbc:postgresql://postgres-postgresql.postgresql.svc:5432/TrainingLicenseSharing"
+          #   - name: FLYWAY_USER
+          #     value: "tls_backend"
+          #   - name: FLYWAY_PASSWORD
+          #     value: "admin"
+          command: ["sh", "-c", "./database/db-env.sh"]
+      restartPolicy: Never
+  backoffLimit: 4
+---
+apiVersion: v1
+data:
+  FLYWAY_PASSWORD: YWRtaW4=
+  FLYWAY_URL: amRiYzpwb3N0Z3Jlc3FsOi8vcG9zdGdyZXMtcG9zdGdyZXNxbC5wb3N0Z3Jlc3FsLnN2Yzo1NDMyL1RyYWluaW5nTGljZW5zZVNoYXJpbmc=
+  FLYWAY_USER: dGxzX2JhY2tlbmQ=
+kind: Secret
+metadata:
+  name: tls-migration-credentials
+type: Opaque

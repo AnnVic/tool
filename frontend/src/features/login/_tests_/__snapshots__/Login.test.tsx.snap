@@ -1,0 +1,100 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`Login > Should render Login page 1`] = `
+<DocumentFragment>
+  <section
+    class="sc-kEjbdu fYAfYi"
+  >
+    <div
+      class="sc-bdfCDU iUcrJN"
+      data-testid="book-sharing-cover-wrapper"
+    >
+      <img
+        class="sc-gsTDqH"
+        src="/src/assets/endava-logo.png"
+      />
+      <h1>
+        book 
+        <span>
+          sharing
+        </span>
+      </h1>
+    </div>
+    <div
+      class="sc-crrtmM ultnU"
+    >
+      <div>
+        <header
+          class="sc-iqHXzD dfwozg"
+        >
+          <h2>
+            Login
+          </h2>
+          <span>
+            Don't have an account yet?
+          </span>
+          <a
+            href="/signup"
+          >
+            Sign Up
+          </a>
+        </header>
+        <form
+          class="sc-gKsecS dtuRmj"
+        >
+          <div
+            class="sc-jSguLX ddSyvC"
+            direction="column"
+          >
+            <label
+              class="sc-fubDmA kPKLyk"
+              for="username"
+            >
+              Username
+            </label>
+            <input
+              class="sc-pGaPU guLLSg"
+              data-testid="username-input"
+              name="username"
+              placeholder="Enter username"
+              type="username"
+              value=""
+            />
+          </div>
+          <div
+            class="sc-jSguLX ddSyvC"
+            direction="column"
+          >
+            <label
+              class="sc-fubDmA kPKLyk"
+              for="password"
+            >
+              Password
+            </label>
+            <input
+              class="sc-pGaPU guLLSg"
+              data-testid="password-input"
+              name="password"
+              placeholder="Enter password"
+              type="password"
+              value=""
+            />
+          </div>
+          <a
+            href="/forgot-password"
+          >
+            Forgot password?
+          </a>
+          <button
+            class="sc-dlfmHC kFGipp"
+            data-testid="submit-button"
+            type="submit"
+          >
+            Login
+          </button>
+        </form>
+      </div>
+    </div>
+  </section>
+</DocumentFragment>
+`;

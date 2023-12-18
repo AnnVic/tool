@@ -1,0 +1,72 @@
+stages:
+  - sonarqube-check
+  - build_image
+  - tagging
+  - pre_build
+
+build-only-MR:
+  stage: pre_build
+  image:
+    name: gcr.io/kaniko-project/executor:debug
+    entrypoint: [""]
+  script:
+    - /kaniko/executor --context "${CI_PROJECT_DIR}" --dockerfile "${CI_PROJECT_DIR}/Dockerfile" --no-push
+  only:
+    - merge_requests
+
+
+sonarqube-check:
+  stage: sonarqube-check
+  image: mcr.microsoft.com/dotnet/sdk:6.0
+  variables:
+    GIT_DEPTH: "0" # Tells git to fetch all the branches of the project, required by the analysis task
+  script:
+    - "apt-get update"
+    - "apt-get install --yes --no-install-recommends openjdk-17-jre"
+    - "dotnet tool install --global dotnet-sonarscanner"
+    - "dotnet tool install --global dotnet-coverage"
+    - 'export PATH="$PATH:$HOME/.dotnet/tools"'
+      ##Commented Old command
+    ##- 'dotnet sonarscanner begin /k:"book-sharing_backend_AYvYAN9Dj4VoHDJaXxQM" /d:sonar.token="$SONAR_TOKEN" /d:"sonar.host.url=$SONAR_HOST_URL" /d:"sonar.cs.vscoveragexml.reportsPaths=coverage.xml" /d:"sonar.qualitygate.wait=true" '
+    - "dotnet sonarscanner begin /k:\"book-sharing_backend_AYvYAN9Dj4VoHDJaXxQM\" /d:sonar.token=\"$SONAR_TOKEN\" /d:\"sonar.host.url=$SONAR_HOST_URL\" /d:\"sonar.cs.vscoveragexml.reportsPaths=coverage.xml\" /d:\"sonar.qualitygate.wait=true\""
+    - "dotnet build --no-incremental"
+    - "dotnet-coverage collect 'dotnet test' -f xml  -o 'coverage.xml'"
+    - 'dotnet sonarscanner end /d:sonar.token="$SONAR_TOKEN"'
+  allow_failure: true
+  only:
+    - main
+  
+
+build-backend:
+  stage: build_image
+  image:
+    name: gcr.io/kaniko-project/executor:debug
+    entrypoint: [""]
+  before_script:
+    - VERSION=$(cat ${CI_PROJECT_DIR}/src/BookSharingApi/appsettings.json| grep APP_VERSION | grep -o -E '[0-9]+[.][0-9]+[.][0-9]')
+
+  script:
+    - echo "{\"auths\":{\"$NEXUS_URL\":{\"auth\":\"$(echo -n $NEXUS_USER:$NEXUS_PASS | base64)\"}}}"> /kaniko/.docker/config.json
+    - /kaniko/executor --context "${CI_PROJECT_DIR}" --dockerfile "${CI_PROJECT_DIR}/Dockerfile" --destination "$NEXUS_REPO:$VERSION"
+  only:
+    - main
+
+tagging:
+  stage: tagging
+  image: rdcib/git:latest
+  before_script:
+    - git remote set-url origin "https://$REPO_TOKEN_NAME:$REPO_ACCESS_TOKEN@gitlab.tool.mddinternship.com/devops/argocd.git"
+    - git config --global user.email "versioningBot@endava.com"
+    - git config --global user.name "versioningBot"
+    # Reset to remote main branch
+    - git clone https://$REPO_TOKEN_NAME:$REPO_ACCESS_TOKEN@gitlab.tool.mddinternship.com/devops/argocd.git
+    - cd argocd/Booksharing/Backend
+  script:
+    - VERSION=$(cat ${CI_PROJECT_DIR}/src/BookSharingApi/appsettings.json| grep APP_VERSION | grep -o -E '[0-9]+[.][0-9]+[.][0-9]')
+    - yq -i 'select(di == 3).spec.template.spec.containers[0].image = "'$NEXUS_REPO':'$VERSION'"' ArgoCD.yaml
+    - git add ArgoCD.yaml
+    - git commit -m "Update TagImage to '$VERSION'"
+    - git push -o ci.skip origin HEAD:main
+  needs: [build-backend]
+  only:
+    - main

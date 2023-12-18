@@ -1,0 +1,97 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    appgw.ingress.kubernetes.io/health-probe-status-codes: 200-499
+    appgw.ingress.kubernetes.io/ssl-redirect: 'true'
+    cert-manager.io/acme-challenge-type: http01
+    cert-manager.io/cluster-issuer: cert-manager-global
+    external-dns.alpha.kubernetes.io/hostname: booksharing-be.app.mddinternship.com
+  labels:
+    app: back
+  name: back-ingres
+spec:
+  rules:
+    - host: booksharing-be.app.mddinternship.com
+      http:
+        paths:
+          - backend:
+              service:
+                name: back-service
+                port:
+                  number: 5000
+            path: /
+            pathType: Prefix
+  tls:
+    - hosts:
+        - booksharing-be.app.mddinternship.com
+      secretName: booksharing-backend-db-tls
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: back-service
+spec:
+  selector:
+    app: back
+  ports:
+    - protocol: TCP
+      port: 5000
+      targetPort: 80
+---
+apiVersion: v1
+data:
+  .dockerconfigjson: ewogICJhdXRocyI6IHsKICAgICJuZXh1cy50b29sLm1kZGludGVybnNoaXAuY29tIjogewogICAgICAiYXV0aCI6ICJZV1J0YVc0NmJtVjRkWE5CWkcxcGJnPT0iCiAgICB9CiAgfQp9Cg==
+kind: Secret
+metadata:
+  name: nexus-docker
+type: kubernetes.io/dockerconfigjson
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: back
+  labels:
+    app: back
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: back
+  template:
+    metadata:
+      labels:
+        app: back
+    spec:
+      containers:
+        - name: bsbackend
+          image: nexus.tool.mddinternship.com/repository/booksharing_be:1.4.0
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 80
+          volumeMounts:
+            - mountPath: app/StaticFiles/
+              name: booksharing-data
+              subPath: null
+      imagePullSecrets:
+        - name: nexus-docker
+      volumes:
+        - name: booksharing-data
+          persistentVolumeClaim:
+            claimName: back
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  annotations:
+    volume.beta.kubernetes.io/storage-provisioner: ebs.csi.aws.com
+    volume.kubernetes.io/storage-provisioner: ebs.csi.aws.com
+  labels:
+    app: back
+  name: back
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi

@@ -1,0 +1,51 @@
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;800&family=Roboto:wght@300;400;500;700&display=swap');
+
+html {
+  overflow-x: hidden;
+  margin-right: calc(-1 * (100vw - 100%));
+}
+
+*,
+*::before,
+*::after {
+  padding: 0;
+  margin: 0;
+  box-sizing: border-box;
+}
+
+:root {
+  --font-family: 'Roboto Light', sans-serif;
+  --color-danger-dark: #b84743;
+  --color-danger-medium: #d9534f;
+  --color-danger-light: #e68f8c;
+
+  --color-success-dark: #40a262;
+  --color-success-medium: #4bbf73;
+  --color-success-light: #8ad5a4;
+
+  --color-info-dark: #1a84b0;
+  --color-info-medium: #1f9bcf;
+  --color-info-light: #6dbee0;
+
+  --color-warning-dark: #bd883d;
+  --color-warning-medium: #f0ad4e;
+  --color-warning-light: #f5ca8c;
+
+  --color-primary-dark: #222222;
+  --color-primary-medium: #4d4d4d;
+  --color-primary-gray: #b1b1b1;
+  --color-primary-light: #e1e1e1;
+  --color-primary-extra-light: #f7f7f7;
+  --color-white: #ffffff;
+
+  --transition-quickly: 0.3s ease all;
+}
+
+body {
+  font-family: var(--font-family);
+}
+
+button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}

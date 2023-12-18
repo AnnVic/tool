@@ -1,0 +1,87 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    appgw.ingress.kubernetes.io/health-probe-status-codes: 200-499
+    nginx.ingress.kubernetes.io/whitelist-source-range: 193.33.93.43/32
+    appgw.ingress.kubernetes.io/ssl-redirect: 'true'
+    cert-manager.io/acme-challenge-type: http01
+    cert-manager.io/cluster-issuer: cert-manager-global
+    external-dns.alpha.kubernetes.io/hostname: parkinglot-be.app.mddinternship.com
+  labels:
+    app: parking-lot
+  name: pl-ingress
+spec:
+  rules:
+    - host: parkinglot-be.app.mddinternship.com
+      http:
+        paths:
+          - backend:
+              service:
+                name: pl-svc
+                port:
+                  number: 5000
+            path: /
+            pathType: Prefix
+  tls:
+    - hosts:
+        - parkinglot-be.app.mddinternship.com
+      secretName: pl-be-tls
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: pl-svc
+spec:
+  selector:
+    app: parking-lot
+  ports:
+    - protocol: TCP
+      port: 5000
+      targetPort: 8080
+---
+apiVersion: v1
+data:
+  .dockerconfigjson: ewogICJhdXRocyI6IHsKICAgICJuZXh1cy50b29sLm1kZGludGVybnNoaXAuY29tIjogewogICAgICAiYXV0aCI6ICJZV1J0YVc0NmJtVjRkWE5CWkcxcGJnPT0iCiAgICB9CiAgfQp9Cg==
+kind: Secret
+metadata:
+  name: nexus-docker
+type: kubernetes.io/dockerconfigjson
+---
+apiVersion: v1
+data:
+  FLYWAY_PASSWORD: YUtkc2pmJiNmYUAjaEc=
+  FLYWAY_URL: amRiYzpwb3N0Z3Jlc3FsOi8vcG9zdGdyZXMtcG9zdGdyZXNxbC5wb3N0Z3Jlc3FsLnN2Yzo1NDMyL1BhcmtpbmdMb3Q=
+  FLYWAY_USER: cGFya2luZ2xvdA==
+kind: Secret
+metadata:
+  name: parking-lot-secret
+type: Opaque
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: parking-lot
+  labels:
+    app: parking-lot
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: parking-lot
+  template:
+    metadata:
+      labels:
+        app: parking-lot
+    spec:
+      containers:
+        - name: parking-lot
+          image: nexus.tool.mddinternship.com/repository/parking-lot:610cc9635a4b1fbbfb1be2b55262cd233aa37a6f
+          imagePullPolicy: Always
+          envFrom:
+            - secretRef:
+                name: parking-lot-secret
+          ports:
+            - containerPort: 8080
+      imagePullSecrets:
+        - name: nexus-docker

@@ -1,0 +1,43 @@
+version: '3.8'
+
+networks:
+  dev:
+    driver: bridge
+
+services:
+  postgres:
+    image: postgres:latest
+    user: postgres
+    healthcheck:
+       test: ["CMD-SHELL", "pg_isready"]
+       interval: 10s
+       timeout: 5s
+       retries: 5
+    ports:
+     - "5432:5432"
+    restart: always
+    volumes:
+      - app_data:/var/lib/postgresql/data
+    networks:
+      - dev
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=Utm15937
+      - POSTGRES_DB=BookSharingDB
+
+  backend:
+    build:
+       context: .
+       dockerfile: Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "80:80"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ConnectionStrings__DefaultConnection=User ID=postgres;Password=Utm15937;Server=postgres;Port=5432;Database=BookSharingDB;
+    networks:
+      - dev
+volumes:
+  app_data:
